@@ -4,14 +4,36 @@ using System.Collections.Immutable;
 
 namespace VariantEnum;
 
-internal class VariantEnumContext(
-    EnumDeclarationSyntax enumDeclarationSyntax,
-    Compilation compilation,
-    ImmutableArray<EnumMemberDeclarationSyntax> members)
+internal class VariantEnumContext
 {
-    public EnumDeclarationSyntax EnumDeclarationSyntax { get; } = enumDeclarationSyntax;
+    public INamedTypeSymbol Symbol { get; }
 
-    public Compilation Compilation { get; } = compilation;
+    public EnumDeclarationSyntax EnumDeclarationSyntax { get; }
 
-    public ImmutableArray<EnumMemberDeclarationSyntax> Members { get; } = members;
+    public Compilation Compilation { get; }
+
+    public ImmutableArray<VariantValueTypeMemberDeclarationSyntax> Members { get; }
+
+    public VariantEnumContext(EnumDeclarationSyntax enumDeclarationSyntax, Compilation compilation, ImmutableArray<VariantValueTypeMemberDeclarationSyntax> members)
+    {
+        EnumDeclarationSyntax = enumDeclarationSyntax;
+        Compilation = compilation;
+        Members = members;
+
+        var model = Compilation.GetSemanticModel(EnumDeclarationSyntax.SyntaxTree);
+        Symbol = (INamedTypeSymbol)model.GetDeclaredSymbol(EnumDeclarationSyntax)!;
+    }
+}
+
+internal class VariantValueTypeMemberDeclarationSyntax
+{
+    public EnumMemberDeclarationSyntax MemberSyntax { get;  }
+
+    public bool EnableVariantValueType { get; }
+
+    public VariantValueTypeMemberDeclarationSyntax(EnumMemberDeclarationSyntax memberSyntax, bool enableVariantValueType) 
+    {
+        MemberSyntax = memberSyntax;
+        EnableVariantValueType = enableVariantValueType;
+    }
 }
