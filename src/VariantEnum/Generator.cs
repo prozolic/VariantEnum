@@ -97,15 +97,15 @@ public class VariantValueTypeAttribute : Attribute
             return;
         }
 
-        var varientEnumName = source.EnumDeclarationSyntax.Identifier.Text.Split(["Variant"], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        var variantEnumName = source.EnumDeclarationSyntax.Identifier.Text.Split(["Variant"], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
 
-        context.AddSource($"{varientEnumName}_generated.g.cs", Emitter.Emit(source, varientEnumName));
+        context.AddSource($"{variantEnumName}_generated.g.cs", Emitter.Emit(source, variantEnumName));
     }
 
 
     internal class Emitter
     {
-        public static string Emit(VariantEnumContext context, string varientEnumName)
+        public static string Emit(VariantEnumContext context, string variantEnumName)
         {
             var ns = context.Symbol!.ContainingNamespace.IsGlobalNamespace ? string.Empty : $"namespace {context.Symbol!.ContainingNamespace};";
             var code = @$"
@@ -124,30 +124,30 @@ using System.Runtime.CompilerServices;
 
 {ns}
 
-public abstract record {varientEnumName} : ISpanFormattable
+public abstract record {variantEnumName} : ISpanFormattable
 {{
-{EmitMembers(context, varientEnumName)}
+{EmitMembers(context, variantEnumName)}
     public abstract bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null);
 
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-{EmitMethod(context, varientEnumName)}
+{EmitMethod(context, variantEnumName)}
 
 }}";
             return code;
         }
 
-        private static string EmitMembers(VariantEnumContext context, string varientEnumName)
+        private static string EmitMembers(VariantEnumContext context, string variantEnumName)
         {
             var builder = new StringBuilder();
 
             foreach(var member in context.Members)
             {
-                var code = @$"    public sealed record {member.MemberSyntax.Identifier.Text}{EmitVarient(context, member)} : {varientEnumName}
+                var code = @$"    public sealed record {member.MemberSyntax.Identifier.Text}{Emitvariant(context, member)} : {variantEnumName}
     {{
 {EmitDefault(member)}
 
-{EmitSpanFormattable(member, varientEnumName)}
+{EmitSpanFormattable(member, variantEnumName)}
     }}
 ";
                 builder.AppendLine(code);
@@ -182,7 +182,7 @@ public abstract record {varientEnumName} : ISpanFormattable
             }
         }
 
-        private static string EmitVarient(VariantEnumContext context, VariantValueTypeMemberDeclarationSyntax syntax)
+        private static string Emitvariant(VariantEnumContext context, VariantValueTypeMemberDeclarationSyntax syntax)
         {
             if (!syntax.EnableVariantValueType) return string.Empty;
 
@@ -203,7 +203,7 @@ public abstract record {varientEnumName} : ISpanFormattable
             return builder.ToString();
         }
 
-        private static string EmitSpanFormattable(VariantValueTypeMemberDeclarationSyntax syntax, string varientEnumName)
+        private static string EmitSpanFormattable(VariantValueTypeMemberDeclarationSyntax syntax, string variantEnumName)
         {
             var variantName = syntax.MemberSyntax.Identifier.Text;
             var length = syntax.MemberSyntax.Identifier.Text.Length;
@@ -285,20 +285,20 @@ public abstract record {varientEnumName} : ISpanFormattable
             return code;
         }
 
-        private static string EmitMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitMethod(VariantEnumContext context, string variantEnumName)
         {
             var builder = new StringBuilder();
             builder.AppendLine($"    public static int Count => {context.Members.Length};");
-            builder.AppendLine(EmitGetNameMethod(context, varientEnumName));
-            builder.AppendLine(EmitGetNamesMethod(context, varientEnumName));
-            builder.AppendLine(EmitGetNumericValueMethod(context, varientEnumName));
-            builder.AppendLine(EmitConvertEnumMethod(context, varientEnumName));
-            builder.Append(EmitParseMethod(context, varientEnumName));
+            builder.AppendLine(EmitGetNameMethod(context, variantEnumName));
+            builder.AppendLine(EmitGetNamesMethod(context, variantEnumName));
+            builder.AppendLine(EmitGetNumericValueMethod(context, variantEnumName));
+            builder.AppendLine(EmitConvertEnumMethod(context, variantEnumName));
+            builder.Append(EmitParseMethod(context, variantEnumName));
 
             return builder.ToString();
         }
 
-        private static string EmitGetNameMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitGetNameMethod(VariantEnumContext context, string variantEnumName)
         {
             var builder = new StringBuilder();
             var symbol = context.Symbol;
@@ -307,12 +307,12 @@ public abstract record {varientEnumName} : ISpanFormattable
                 var memberName = m.MemberSyntax.Identifier.Text;
                 builder.AppendLine($"            {memberName} => nameof({memberName}),");
             }
-            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
+            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
 
             var code = @$"
-    public static string GetName({varientEnumName} {varientEnumName.ToLower()})
+    public static string GetName({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {varientEnumName.ToLower()} switch
+        return {variantEnumName.ToLower()} switch
         {{
 {builder}
         }};
@@ -320,7 +320,7 @@ public abstract record {varientEnumName} : ISpanFormattable
             return code;
         }
 
-        private static string EmitGetNamesMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitGetNamesMethod(VariantEnumContext context, string variantEnumName)
         {
             var builder = new StringBuilder();
             builder.Append("[");
@@ -340,7 +340,7 @@ public abstract record {varientEnumName} : ISpanFormattable
             return code;
         }
 
-        private static string EmitGetNumericValueMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitGetNumericValueMethod(VariantEnumContext context, string variantEnumName)
         {
             var builder = new StringBuilder();
             var symbol = context.Symbol;
@@ -350,7 +350,7 @@ public abstract record {varientEnumName} : ISpanFormattable
                 var value = m.MemberSyntax.EqualsValue;
                 if (value == null)
                 {
-                    builder.AppendLine($"            {memberName} => ({symbol.EnumUnderlyingType}){varientEnumName}Variant.{m.MemberSyntax.Identifier.Text},");
+                    builder.AppendLine($"            {memberName} => ({symbol.EnumUnderlyingType}){variantEnumName}Variant.{m.MemberSyntax.Identifier.Text},");
                 }
                 else
                 {
@@ -358,12 +358,12 @@ public abstract record {varientEnumName} : ISpanFormattable
                     builder.AppendLine($"            {memberName} => {valueText},");
                 }
             }
-            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
+            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
 
             var code = @$"
-    public static {symbol.EnumUnderlyingType} GetNumericValue({varientEnumName} {varientEnumName.ToLower()})
+    public static {symbol.EnumUnderlyingType} GetNumericValue({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {varientEnumName.ToLower()} switch
+        return {variantEnumName.ToLower()} switch
         {{
 {builder}
         }};
@@ -371,48 +371,48 @@ public abstract record {varientEnumName} : ISpanFormattable
             return code;
         }
 
-        private static string EmitConvertEnumMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitConvertEnumMethod(VariantEnumContext context, string variantEnumName)
         {
-            var enumName = $"{varientEnumName}Variant";
+            var enumName = $"{variantEnumName}Variant";
 
             var convertBuilder = new StringBuilder();
             foreach(var m in context.Members)
             {
                 convertBuilder.AppendLine($"            {m.MemberSyntax.Identifier.Text} => {enumName}.{m.MemberSyntax.Identifier.Text},");
             }
-            convertBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
+            convertBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
 
             var tryConvertBuilder = new StringBuilder();
             foreach (var m in context.Members)
             {
                 tryConvertBuilder.AppendLine($"            case {m.MemberSyntax.Identifier.Text}:");
-                tryConvertBuilder.AppendLine($"                {varientEnumName.ToLower()}Variant = {enumName}.{m.MemberSyntax.Identifier.Text};");
+                tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()}Variant = {enumName}.{m.MemberSyntax.Identifier.Text};");
                 tryConvertBuilder.AppendLine($"                return true;");
             }
 
             var code = @$"
-    public static {enumName} ConvertEnum({varientEnumName} {varientEnumName.ToLower()})
+    public static {enumName} ConvertEnum({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {varientEnumName.ToLower()} switch
+        return {variantEnumName.ToLower()} switch
         {{
 {convertBuilder}
         }};
     }}
 
-    public static bool TryConvertEnum({varientEnumName} {varientEnumName.ToLower()}, out {enumName} {varientEnumName.ToLower()}Variant)
+    public static bool TryConvertEnum({variantEnumName} {variantEnumName.ToLower()}, out {enumName} {variantEnumName.ToLower()}Variant)
     {{
-        switch({varientEnumName.ToLower()})
+        switch({variantEnumName.ToLower()})
         {{
 {tryConvertBuilder}
         }}
-        {varientEnumName.ToLower()}Variant = default;
+        {variantEnumName.ToLower()}Variant = default;
         return false;
     }}
 ";
             return code;
         }
 
-        private static string EmitParseMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitParseMethod(VariantEnumContext context, string variantEnumName)
         {
             var parseBuilder = new StringBuilder();
             foreach (var m in context.Members)
@@ -427,11 +427,11 @@ public abstract record {varientEnumName} : ISpanFormattable
             {
                 var memberName = m.MemberSyntax.Identifier.Text;
                 tryConvertBuilder.AppendLine($@"            case ""{m.MemberSyntax.Identifier.Text}"":");
-                tryConvertBuilder.AppendLine($"                {varientEnumName.ToLower()} = {memberName}.Default;");
+                tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()} = {memberName}.Default;");
                 tryConvertBuilder.AppendLine($"                return true;");
             }
 
-            var code = @$"    public static {varientEnumName} Parse(string value)
+            var code = @$"    public static {variantEnumName} Parse(string value)
     {{
         return value switch
         {{
@@ -439,13 +439,13 @@ public abstract record {varientEnumName} : ISpanFormattable
         }};
     }}
 
-    public static bool TryParse(string value, out {varientEnumName} {varientEnumName.ToLower()})
+    public static bool TryParse(string value, out {variantEnumName} {variantEnumName.ToLower()})
     {{
         switch (value)
         {{
 {tryConvertBuilder}
         }}
-        {varientEnumName.ToLower()} = default;
+        {variantEnumName.ToLower()} = default;
         return false;
     }}
 ";
