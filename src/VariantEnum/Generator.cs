@@ -120,6 +120,7 @@ public class VariantValueTypeAttribute : Attribute
 #pragma warning disable CS8619 // Possible null reference assignment fix
 
 using System;
+using System.Runtime.CompilerServices;
 
 {ns}
 
@@ -128,7 +129,7 @@ public abstract record {varientEnumName} : ISpanFormattable
 {EmitMembers(context, varientEnumName)}
     public abstract bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null);
 
-    public abstract string ToString(string? format, IFormatProvider? formatProvider);
+    public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
 {EmitMethod(context, varientEnumName)}
 
@@ -149,7 +150,7 @@ public abstract record {varientEnumName} : ISpanFormattable
 {EmitSpanFormattable(member, varientEnumName)}
     }}
 ";
-                builder.Append(code);
+                builder.AppendLine(code);
             }
             return builder.ToString();
         }
@@ -165,7 +166,7 @@ public abstract record {varientEnumName} : ISpanFormattable
             {
 
                 var index = 0;
-                var attr = syntax.MemberSyntax.AttributeLists.Skip(1).FirstOrDefault();
+                var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
                 var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
                 var builder = new StringBuilder();
                 foreach (var a in arguments)
@@ -187,7 +188,7 @@ public abstract record {varientEnumName} : ISpanFormattable
 
             var builder = new StringBuilder();
             var index = 0;
-            var attr = syntax.MemberSyntax.AttributeLists.Skip(1).FirstOrDefault();
+            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
             var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
             builder.Append("(");
             foreach (var a in arguments)
@@ -204,23 +205,82 @@ public abstract record {varientEnumName} : ISpanFormattable
 
         private static string EmitSpanFormattable(VariantValueTypeMemberDeclarationSyntax syntax, string varientEnumName)
         {
+            var variantName = syntax.MemberSyntax.Identifier.Text;
             var length = syntax.MemberSyntax.Identifier.Text.Length;
+
+            var variantNameBuilder = new StringBuilder();
+            variantNameBuilder.AppendLine(@$"
+            if (destination.Length < {length} + index)
+            {{
+                charsWritten += index;
+                return false;
+            }}");
+            foreach(var c in variantName)
+            {
+                variantNameBuilder.AppendLine(@$"            destination[index++] = '{c}';");
+            }
+
+            var parameterBuilder = new StringBuilder();
+            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
+            if (attr != null)
+            {
+                var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
+                if (arguments.Count > 0)
+                {
+                    parameterBuilder.AppendLine("            var handler = new DefaultInterpolatedStringHandler();");
+                    var index = 0;
+                    foreach (var a in arguments)
+                    {
+                        parameterBuilder.AppendLine($"            handler.AppendLiteral(\"args{index} = \");");
+                        parameterBuilder.AppendLine($"            handler.AppendFormatted(args{index++});");
+
+                        if (index < arguments.Count)
+                            parameterBuilder.AppendLine($"            handler.AppendFormatted(\", \" );");
+                    }
+                    parameterBuilder.AppendLine("            var print = handler.ToStringAndClear();");
+                    parameterBuilder.AppendLine("            var printSpan = print.AsSpan();");
+                    parameterBuilder.AppendLine(@$"
+            if (destination.Length < printSpan.Length + index)
+            {{
+                charsWritten += index;
+                return false;
+            }}
+            printSpan.CopyTo(destination.Slice(index, printSpan.Length));
+            index += printSpan.Length;");
+                }
+            }
 
             var code = @$"        public override bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
         {{
+            var index = 0;
+            charsWritten = 0;
+
             if (destination.Length < {length})
             {{
-                charsWritten = 0;
+                charsWritten += index;
                 return false;
             }}
+{variantNameBuilder}
+            if (destination.Length < 3 + index)
+            {{
+                charsWritten += index;
+                return false;
+            }}
+            destination[index++] = ' ';
+            destination[index++] = '{{';
+            destination[index++] = ' ';
+{parameterBuilder}
+            if (destination.Length < 2 + index)
+            {{
+                charsWritten += index;
+                return false;
+            }}
+            destination[index++] = ' ';
+            destination[index++] = '}}';
 
-            ""{syntax.MemberSyntax.Identifier.Text}"".CopyTo(destination.Slice(0, {length}));
-            charsWritten = {length};
+            charsWritten = index;
             return true;
         }}
-
-        public override string ToString(string? format, IFormatProvider? formatProvider)
-            => ToString();
 ";
             return code;
         }
@@ -229,44 +289,109 @@ public abstract record {varientEnumName} : ISpanFormattable
         {
             var builder = new StringBuilder();
             builder.AppendLine($"    public static int Count => {context.Members.Length};");
-            builder.AppendLine();
-            builder.AppendLine("    public static string[] GetNames()");
-            builder.AppendLine("    {");
-            builder.Append("        return ");
-            builder.Append("[");
-            for (var index = 0; index < context.Members.Length; index++)
-            {
-                builder.Append($@"""{context.Members[index].MemberSyntax.Identifier.Text}""");
-                if (index < context.Members.Length - 1)
-                    builder.Append(", ");
-            }
-            builder.AppendLine("];");
-            builder.AppendLine("    }");
-            builder.AppendLine(EmitConvertMethod(context, varientEnumName));
+            builder.AppendLine(EmitGetNameMethod(context, varientEnumName));
+            builder.AppendLine(EmitGetNamesMethod(context, varientEnumName));
+            builder.AppendLine(EmitGetNumericValueMethod(context, varientEnumName));
+            builder.AppendLine(EmitConvertEnumMethod(context, varientEnumName));
             builder.Append(EmitParseMethod(context, varientEnumName));
 
             return builder.ToString();
         }
 
-        private static string EmitConvertMethod(VariantEnumContext context, string varientEnumName)
+        private static string EmitGetNameMethod(VariantEnumContext context, string varientEnumName)
         {
+            var builder = new StringBuilder();
+            var symbol = context.Symbol;
+            foreach (var m in context.Members)
+            {
+                var memberName = m.MemberSyntax.Identifier.Text;
+                builder.AppendLine($"            {memberName} => nameof({memberName}),");
+            }
+            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
+
+            var code = @$"
+    public static string GetName({varientEnumName} {varientEnumName.ToLower()})
+    {{
+        return {varientEnumName.ToLower()} switch
+        {{
+{builder}
+        }};
+    }}";
+            return code;
+        }
+
+        private static string EmitGetNamesMethod(VariantEnumContext context, string varientEnumName)
+        {
+            var builder = new StringBuilder();
+            builder.Append("[");
+            for (var index = 0; index < context.Members.Length; index++)
+            {
+                builder.Append($@"nameof({context.Members[index].MemberSyntax.Identifier.Text})");
+                if (index < context.Members.Length - 1)
+                    builder.Append(", ");
+            }
+            builder.Append("];");
+
+            var code = @$"
+    public static string[] GetNames()
+    {{
+        return {builder}
+    }}";
+            return code;
+        }
+
+        private static string EmitGetNumericValueMethod(VariantEnumContext context, string varientEnumName)
+        {
+            var builder = new StringBuilder();
+            var symbol = context.Symbol;
+            foreach (var m in context.Members)
+            {
+                var memberName = m.MemberSyntax.Identifier.Text;
+                var value = m.MemberSyntax.EqualsValue;
+                if (value == null)
+                {
+                    builder.AppendLine($"            {memberName} => ({symbol.EnumUnderlyingType}){varientEnumName}Variant.{m.MemberSyntax.Identifier.Text},");
+                }
+                else
+                {
+                    var valueText = ((LiteralExpressionSyntax)value.Value).Token.ValueText;
+                    builder.AppendLine($"            {memberName} => {valueText},");
+                }
+            }
+            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
+
+            var code = @$"
+    public static {symbol.EnumUnderlyingType} GetNumericValue({varientEnumName} {varientEnumName.ToLower()})
+    {{
+        return {varientEnumName.ToLower()} switch
+        {{
+{builder}
+        }};
+    }}";
+            return code;
+        }
+
+        private static string EmitConvertEnumMethod(VariantEnumContext context, string varientEnumName)
+        {
+            var enumName = $"{varientEnumName}Variant";
+
             var convertBuilder = new StringBuilder();
             foreach(var m in context.Members)
             {
-                convertBuilder.AppendLine($"            {m.MemberSyntax.Identifier.Text} {m.MemberSyntax.Identifier.Text.ToLower()} => {varientEnumName}Variant.{m.MemberSyntax.Identifier.Text},");
+                convertBuilder.AppendLine($"            {m.MemberSyntax.Identifier.Text} => {enumName}.{m.MemberSyntax.Identifier.Text},");
             }
-            convertBuilder.AppendLine($"            _ => throw new NotImplementedException(nameof({varientEnumName.ToLower()}))");
+            convertBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof({varientEnumName.ToLower()}))");
 
             var tryConvertBuilder = new StringBuilder();
             foreach (var m in context.Members)
             {
                 tryConvertBuilder.AppendLine($"            case {m.MemberSyntax.Identifier.Text}:");
-                tryConvertBuilder.AppendLine($"                {varientEnumName.ToLower()}Variant = {varientEnumName}Variant.{m.MemberSyntax.Identifier.Text};");
+                tryConvertBuilder.AppendLine($"                {varientEnumName.ToLower()}Variant = {enumName}.{m.MemberSyntax.Identifier.Text};");
                 tryConvertBuilder.AppendLine($"                return true;");
             }
 
             var code = @$"
-    public static {varientEnumName}Variant Convert({varientEnumName} {varientEnumName.ToLower()})
+    public static {enumName} ConvertEnum({varientEnumName} {varientEnumName.ToLower()})
     {{
         return {varientEnumName.ToLower()} switch
         {{
@@ -274,7 +399,7 @@ public abstract record {varientEnumName} : ISpanFormattable
         }};
     }}
 
-    public static bool TryConvert({varientEnumName} {varientEnumName.ToLower()}, out {varientEnumName}Variant {varientEnumName.ToLower()}Variant)
+    public static bool TryConvertEnum({varientEnumName} {varientEnumName.ToLower()}, out {enumName} {varientEnumName.ToLower()}Variant)
     {{
         switch({varientEnumName.ToLower()})
         {{
@@ -286,6 +411,7 @@ public abstract record {varientEnumName} : ISpanFormattable
 ";
             return code;
         }
+
         private static string EmitParseMethod(VariantEnumContext context, string varientEnumName)
         {
             var parseBuilder = new StringBuilder();
@@ -294,7 +420,7 @@ public abstract record {varientEnumName} : ISpanFormattable
                 var memberName = m.MemberSyntax.Identifier.Text;
                 parseBuilder.AppendLine($"            \"{memberName}\" => {memberName}.Default,");
             }
-            parseBuilder.AppendLine($"            _ => throw new NotImplementedException(nameof(value))");
+            parseBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof(value))");
 
             var tryConvertBuilder = new StringBuilder();
             foreach (var m in context.Members)
