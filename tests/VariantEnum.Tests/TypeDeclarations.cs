@@ -11,4 +11,5 @@ public enum IpAddrVariant : byte
     V4,
     [VariantValueType(typeof(string))]
     V6,
+    None
 }

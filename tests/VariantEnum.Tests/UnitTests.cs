@@ -1,5 +1,6 @@
 using FluentAssertions;
 using System.Buffers;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace VariantEnum.Tests;
 
@@ -80,6 +81,16 @@ public class IpAddrTest
 
             v4.Should().NotBe(v42);
         }
+        {
+            var v6 = new IpAddr.V6("::1");
+            var v62 = new IpAddr.V6("::1");
+            v6.Should().Be(v62);
+        }
+        {
+            var v6 = new IpAddr.V6("::1");
+            var v62 = new IpAddr.V6("::");
+            v6.Should().NotBe(v62);
+        }
     }
 
     [Fact]
@@ -98,6 +109,13 @@ public class IpAddrTest
         v6.TryFormat(buffer.GetSpan(1024), out var charsWritten2).Should().BeTrue();
         buffer.Advance(charsWritten2);
         v6.ToString().AsSpan().SequenceEqual(buffer.WrittenSpan).Should().BeTrue();
+
+        buffer.Clear();
+
+        var none = new IpAddr.None();
+        none.TryFormat(buffer.GetSpan(1024), out var charsWritten3).Should().BeTrue();
+        buffer.Advance(charsWritten3);
+        none.ToString().AsSpan().SequenceEqual(buffer.WrittenSpan).Should().BeTrue();
     }
 
     [Fact]
@@ -116,7 +134,7 @@ public class IpAddrTest
     [Fact]
     public void Count()
     {
-        IpAddr.Count.Should().Be(2);
+        IpAddr.Count.Should().Be(3);
     }
 
     [Fact]
@@ -124,9 +142,11 @@ public class IpAddrTest
     {
         var v4 = new IpAddr.V4(127, 0, 0, 1);
         var v6 = new IpAddr.V6("::1");
+        var none = new IpAddr.None();
 
         IpAddr.GetName(v4).Should().Be(nameof(IpAddr.V4));
         IpAddr.GetName(v6).Should().Be(nameof(IpAddr.V6));
+        IpAddr.GetName(none).Should().Be(nameof(IpAddr.None));
 
         Assert.Throws<InvalidOperationException>(() => IpAddr.GetNumericValue(null));
     }
@@ -138,6 +158,8 @@ public class IpAddrTest
 
         names[0].Should().Be(nameof(IpAddr.V4));
         names[1].Should().Be(nameof(IpAddr.V6));
+        names[2].Should().Be(nameof(IpAddr.None));
+        names.Length.Should().Be(3);
     }
 
     [Fact]
@@ -145,9 +167,11 @@ public class IpAddrTest
     {
         var v4 = new IpAddr.V4(127, 0, 0, 1);
         var v6 = new IpAddr.V6("::1");
+        var none = new IpAddr.None();
 
         IpAddr.GetNumericValue(v4).Should().Be((byte)IpAddrVariant.V4);
         IpAddr.GetNumericValue(v6).Should().Be((byte)IpAddrVariant.V6);
+        IpAddr.GetNumericValue(none).Should().Be((byte)IpAddrVariant.None);
 
         Assert.Throws<InvalidOperationException>(() => IpAddr.GetNumericValue(null));
     }
@@ -157,9 +181,11 @@ public class IpAddrTest
     {
         var v4 = new IpAddr.V4(127, 0, 0, 1);
         var v6 = new IpAddr.V6("::1");
+        var none = new IpAddr.None();
 
         IpAddr.ConvertEnum(v4).Should().Be(IpAddrVariant.V4);
         IpAddr.ConvertEnum(v6).Should().Be(IpAddrVariant.V6);
+        IpAddr.ConvertEnum(none).Should().Be(IpAddrVariant.None);
 
         Assert.Throws<InvalidOperationException>(() => IpAddr.ConvertEnum(null));
     }
@@ -169,11 +195,14 @@ public class IpAddrTest
     {
         var v4 = new IpAddr.V4(127, 0, 0, 1);
         var v6 = new IpAddr.V6("::1");
+        var none = new IpAddr.None();
 
         IpAddr.TryConvertEnum(v4, out var v4Enum).Should().BeTrue();
         v4Enum.Should().Be(IpAddrVariant.V4);
         IpAddr.TryConvertEnum(v6, out var v6Enum).Should().BeTrue();
         v6Enum.Should().Be(IpAddrVariant.V6);
+        IpAddr.TryConvertEnum(none, out var noneEnum).Should().BeTrue();
+        noneEnum.Should().Be(IpAddrVariant.None);
 
         IpAddr.TryConvertEnum(null, out var _).Should().BeFalse();
     }
@@ -183,8 +212,9 @@ public class IpAddrTest
     {
         IpAddr.Parse("V4").Should().Be(IpAddr.V4.Default);
         IpAddr.Parse("V6").Should().Be(IpAddr.V6.Default);
+        IpAddr.Parse("None").Should().Be(IpAddr.None.Default);
 
-        Assert.Throws<InvalidOperationException>(() => IpAddr.Parse("None"));
+        Assert.Throws<InvalidOperationException>(() => IpAddr.Parse(string.Empty));
     }
 
     [Fact]
@@ -194,8 +224,10 @@ public class IpAddrTest
         v4Enum.Should().Be(IpAddr.V4.Default);
         IpAddr.TryParse("V6", out var v6Enum).Should().BeTrue();
         v6Enum.Should().Be(IpAddr.V6.Default);
+        IpAddr.TryParse("None", out var noneEnum).Should().BeTrue();
+        noneEnum.Should().Be(IpAddr.None.Default);
 
-        IpAddr.TryParse("None", out var _).Should().BeFalse();
+        IpAddr.TryParse(string.Empty, out var _).Should().BeFalse();
     }
 
     [Fact]
@@ -203,10 +235,12 @@ public class IpAddrTest
     {
         IpAddr.IsDefined("V4").Should().BeTrue();
         IpAddr.IsDefined("V6").Should().BeTrue();
-        IpAddr.IsDefined("None").Should().BeFalse();
+        IpAddr.IsDefined("None").Should().BeTrue();
+        IpAddr.IsDefined(string.Empty).Should().BeFalse();
 
         IpAddr.IsDefined(new IpAddr.V4(127, 0, 0, 1)).Should().BeTrue();
         IpAddr.IsDefined(new IpAddr.V6("::1")).Should().BeTrue();
+        IpAddr.IsDefined(new IpAddr.None()).Should().BeTrue();
         IpAddr.IsDefined((IpAddr)default).Should().BeFalse();
     }
 }
