@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿
 namespace VariantEnum.Tests;
+
+public enum NoneVariant
+{
+}
 
 public enum IpAddrVariant : byte
 {
@@ -13,4 +12,3 @@ public enum IpAddrVariant : byte
     [VariantValueType(typeof(string))]
     V6,
 }
-
