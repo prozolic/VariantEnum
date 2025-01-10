@@ -208,48 +208,71 @@ public abstract record {variantEnumName} : ISpanFormattable
             var length = syntax.MemberSyntax.Identifier.Text.Length;
 
             var variantNameBuilder = new StringBuilder();
-            variantNameBuilder.AppendLine(@$"
+            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
+            if (attr != null)
+            {
+                variantNameBuilder.AppendLine(@$"
             if (destination.Length < {length + 3})
             {{
                 charsWritten += index;
                 return false;
             }}");
-            foreach(var c in variantName)
-            {
-                variantNameBuilder.AppendLine(@$"            destination[index++] = '{c}';");
-            }
-            variantNameBuilder.AppendLine(@$"            destination[index++] = ' ';
+                foreach (var c in variantName)
+                {
+                    variantNameBuilder.AppendLine(@$"            destination[index++] = '{c}';");
+                }
+                variantNameBuilder.AppendLine(@$"            destination[index++] = ' ';
             destination[index++] = '{{';
             destination[index++] = ' ';");
 
-            var parameterBuilder = new StringBuilder();
-            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
-            if (attr != null)
-            {
                 var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
                 if (arguments.Count > 0)
                 {
-                    parameterBuilder.AppendLine("            var handler = new DefaultInterpolatedStringHandler();");
+                    variantNameBuilder.AppendLine("            var handler = new DefaultInterpolatedStringHandler();");
                     var index = 0;
                     foreach (var a in arguments)
                     {
-                        parameterBuilder.AppendLine($"            handler.AppendLiteral(\"args{index} = \");");
-                        parameterBuilder.AppendLine($"            handler.AppendFormatted(args{index++});");
+                        variantNameBuilder.AppendLine($"            handler.AppendLiteral(\"args{index} = \");");
+                        variantNameBuilder.AppendLine($"            handler.AppendFormatted(args{index++});");
 
                         if (index < arguments.Count)
-                            parameterBuilder.AppendLine($"            handler.AppendFormatted(\", \" );");
+                            variantNameBuilder.AppendLine($"            handler.AppendFormatted(\", \" );");
                     }
-                    parameterBuilder.AppendLine("            var print = handler.ToStringAndClear();");
-                    parameterBuilder.AppendLine("            var printSpan = print.AsSpan();");
-                    parameterBuilder.AppendLine(@$"
+                    variantNameBuilder.AppendLine("            var print = handler.ToStringAndClear();");
+                    variantNameBuilder.AppendLine("            var printSpan = print.AsSpan();");
+                    variantNameBuilder.AppendLine(@$"
             if (destination.Length < printSpan.Length + index)
             {{
                 charsWritten += index;
                 return false;
             }}
             printSpan.CopyTo(destination.Slice(index, printSpan.Length));
-            index += printSpan.Length;");
+            index += printSpan.Length;
+            if (destination.Length < 2 + index)
+            {{
+                charsWritten += index;
+                return false;
+            }}
+            destination[index++] = ' ';
+            destination[index++] = '}}';");
                 }
+            }
+            else
+            {
+                variantNameBuilder.AppendLine(@$"
+            if (destination.Length < {length + 4})
+            {{
+                charsWritten += index;
+                return false;
+            }}");
+                foreach (var c in variantName)
+                {
+                    variantNameBuilder.AppendLine(@$"            destination[index++] = '{c}';");
+                }
+                variantNameBuilder.AppendLine(@$"            destination[index++] = ' ';
+            destination[index++] = '{{';
+            destination[index++] = ' ';
+            destination[index++] = '}}';");
             }
 
             var code = @$"        public override bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
@@ -257,15 +280,6 @@ public abstract record {variantEnumName} : ISpanFormattable
             var index = 0;
             charsWritten = 0;
 {variantNameBuilder}
-{parameterBuilder}
-            if (destination.Length < 2 + index)
-            {{
-                charsWritten += index;
-                return false;
-            }}
-            destination[index++] = ' ';
-            destination[index++] = '}}';
-
             charsWritten = index;
             return true;
         }}
