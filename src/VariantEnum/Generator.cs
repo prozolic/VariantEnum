@@ -98,7 +98,7 @@ public class VariantValueTypeAttribute : Attribute
         }
 
         var variantEnumName = source.EnumDeclarationSyntax.Identifier.Text.Split(["Variant"], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        context.AddSource($"{variantEnumName}_generated.g.cs", Emitter.Emit(source, variantEnumName));
+        context.AddSource($"{variantEnumName}.g.cs", Emitter.Emit(source, variantEnumName));
     }
 
 
@@ -142,7 +142,7 @@ public abstract record {variantEnumName} : ISpanFormattable
 
             foreach(var member in context.Members)
             {
-                var code = @$"    public sealed record {member.MemberSyntax.Identifier.Text}{Emitvariant(context, member)} : {variantEnumName}
+                var code = @$"    public sealed record {member.MemberSyntax.Identifier.Text}{EmitVariant(context, member)} : {variantEnumName}
     {{
 {EmitDefault(member)}
 
@@ -181,7 +181,7 @@ public abstract record {variantEnumName} : ISpanFormattable
             }
         }
 
-        private static string Emitvariant(VariantEnumContext context, VariantValueTypeMemberDeclarationSyntax syntax)
+        private static string EmitVariant(VariantEnumContext context, VariantValueTypeMemberDeclarationSyntax syntax)
         {
             if (!syntax.EnableVariantValueType) return string.Empty;
 
@@ -209,7 +209,7 @@ public abstract record {variantEnumName} : ISpanFormattable
 
             var variantNameBuilder = new StringBuilder();
             variantNameBuilder.AppendLine(@$"
-            if (destination.Length < {length} + index)
+            if (destination.Length < {length + 3})
             {{
                 charsWritten += index;
                 return false;
@@ -218,6 +218,9 @@ public abstract record {variantEnumName} : ISpanFormattable
             {
                 variantNameBuilder.AppendLine(@$"            destination[index++] = '{c}';");
             }
+            variantNameBuilder.AppendLine(@$"            destination[index++] = ' ';
+            destination[index++] = '{{';
+            destination[index++] = ' ';");
 
             var parameterBuilder = new StringBuilder();
             var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
@@ -253,21 +256,7 @@ public abstract record {variantEnumName} : ISpanFormattable
         {{
             var index = 0;
             charsWritten = 0;
-
-            if (destination.Length < {length})
-            {{
-                charsWritten += index;
-                return false;
-            }}
 {variantNameBuilder}
-            if (destination.Length < 3 + index)
-            {{
-                charsWritten += index;
-                return false;
-            }}
-            destination[index++] = ' ';
-            destination[index++] = '{{';
-            destination[index++] = ' ';
 {parameterBuilder}
             if (destination.Length < 2 + index)
             {{
@@ -302,20 +291,28 @@ public abstract record {variantEnumName} : ISpanFormattable
         {
             var builder = new StringBuilder();
             var symbol = context.Symbol;
-            foreach (var m in context.Members)
+            
+            if (context.Members.Length > 0)
             {
-                var memberName = m.MemberSyntax.Identifier.Text;
-                builder.AppendLine($"            {memberName} => nameof({memberName}),");
+                builder.AppendLine(@$"        return {variantEnumName.ToLower()} switch
+        {{");
+                foreach (var m in context.Members)
+                {
+                    var memberName = m.MemberSyntax.Identifier.Text;
+                    builder.AppendLine($"            {memberName} => nameof({memberName}),");
+                }
+                builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
+                builder.Append(@$"        }};");
             }
-            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
+            else
+            {
+                builder.Append($"        throw new InvalidOperationException(nameof({variantEnumName.ToLower()}));");
+            }
 
             var code = @$"
     public static string GetName({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {variantEnumName.ToLower()} switch
-        {{
 {builder}
-        }};
     }}";
             return code;
         }
@@ -330,13 +327,10 @@ public abstract record {variantEnumName} : ISpanFormattable
                 if (index < context.Members.Length - 1)
                     builder.Append(", ");
             }
-            builder.Append("];");
+            builder.Append("]");
 
             var code = @$"
-    public static string[] GetNames()
-    {{
-        return {builder}
-    }}";
+    public static string[] GetNames() => {builder};";
             return code;
         }
 
@@ -344,29 +338,37 @@ public abstract record {variantEnumName} : ISpanFormattable
         {
             var builder = new StringBuilder();
             var symbol = context.Symbol;
-            foreach (var m in context.Members)
+            
+            if (context.Members.Length > 0)
             {
-                var memberName = m.MemberSyntax.Identifier.Text;
-                var value = m.MemberSyntax.EqualsValue;
-                if (value == null)
+                builder.AppendLine(@$"        return {variantEnumName.ToLower()} switch
+        {{");
+                foreach (var m in context.Members)
                 {
-                    builder.AppendLine($"            {memberName} => ({symbol.EnumUnderlyingType}){variantEnumName}Variant.{m.MemberSyntax.Identifier.Text},");
+                    var memberName = m.MemberSyntax.Identifier.Text;
+                    var value = m.MemberSyntax.EqualsValue;
+                    if (value == null)
+                    {
+                        builder.AppendLine($"            {memberName} => ({symbol.EnumUnderlyingType}){variantEnumName}Variant.{memberName},");
+                    }
+                    else
+                    {
+                        var valueText = ((LiteralExpressionSyntax)value.Value).Token.ValueText;
+                        builder.AppendLine($"            {memberName} => {valueText},");
+                    }
                 }
-                else
-                {
-                    var valueText = ((LiteralExpressionSyntax)value.Value).Token.ValueText;
-                    builder.AppendLine($"            {memberName} => {valueText},");
-                }
+                builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
+                builder.Append(@$"        }};");
             }
-            builder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
+            else
+            {
+                builder.Append($"        throw new InvalidOperationException(nameof({variantEnumName.ToLower()}));");
+            }
 
             var code = @$"
     public static {symbol.EnumUnderlyingType} GetNumericValue({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {variantEnumName.ToLower()} switch
-        {{
 {builder}
-        }};
     }}";
             return code;
         }
@@ -376,37 +378,45 @@ public abstract record {variantEnumName} : ISpanFormattable
             var enumName = $"{variantEnumName}Variant";
 
             var convertBuilder = new StringBuilder();
-            foreach(var m in context.Members)
-            {
-                convertBuilder.AppendLine($"            {m.MemberSyntax.Identifier.Text} => {enumName}.{m.MemberSyntax.Identifier.Text},");
-            }
-            convertBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
-
             var tryConvertBuilder = new StringBuilder();
-            foreach (var m in context.Members)
+
+            if (context.Members.Length > 0)
             {
-                tryConvertBuilder.AppendLine($"            case {m.MemberSyntax.Identifier.Text}:");
-                tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()}Variant = {enumName}.{m.MemberSyntax.Identifier.Text};");
-                tryConvertBuilder.AppendLine($"                return true;");
+                convertBuilder.AppendLine(@$"        return {variantEnumName.ToLower()} switch
+        {{");
+                tryConvertBuilder.Append(@$"        switch({variantEnumName.ToLower()})
+        {{");
+                foreach (var memberName in context.Members.Select(m => m.MemberSyntax.Identifier.Text))
+                {
+                    convertBuilder.AppendLine($"            {memberName} => {enumName}.{memberName},");
+
+                    tryConvertBuilder.AppendLine($"            case {memberName}:");
+                    tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()}Variant = {enumName}.{memberName};");
+                    tryConvertBuilder.AppendLine($"                return true;");
+                }
+                convertBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof({variantEnumName.ToLower()}))");
+                convertBuilder.Append(@$"        }};");
+
+                tryConvertBuilder.Append(@$"        }}
+        {variantEnumName.ToLower()}Variant = default;
+        return false;");
+            }
+            else
+            {
+                convertBuilder.Append($"        throw new InvalidOperationException(nameof({variantEnumName.ToLower()}));");
+                tryConvertBuilder.Append(@$"        {variantEnumName.ToLower()}Variant = default;
+        return false;");
             }
 
             var code = @$"
     public static {enumName} ConvertEnum({variantEnumName} {variantEnumName.ToLower()})
     {{
-        return {variantEnumName.ToLower()} switch
-        {{
 {convertBuilder}
-        }};
     }}
 
     public static bool TryConvertEnum({variantEnumName} {variantEnumName.ToLower()}, out {enumName} {variantEnumName.ToLower()}Variant)
     {{
-        switch({variantEnumName.ToLower()})
-        {{
 {tryConvertBuilder}
-        }}
-        {variantEnumName.ToLower()}Variant = default;
-        return false;
     }}
 ";
             return code;
@@ -415,38 +425,43 @@ public abstract record {variantEnumName} : ISpanFormattable
         private static string EmitParse(VariantEnumContext context, string variantEnumName)
         {
             var parseBuilder = new StringBuilder();
-            foreach (var m in context.Members)
-            {
-                var memberName = m.MemberSyntax.Identifier.Text;
-                parseBuilder.AppendLine($"            \"{memberName}\" => {memberName}.Default,");
-            }
-            parseBuilder.AppendLine($"            _ => throw new InvalidOperationException(nameof(value))");
-
             var tryConvertBuilder = new StringBuilder();
-            foreach (var m in context.Members)
+
+            if (context.Members.Length > 0)
             {
-                var memberName = m.MemberSyntax.Identifier.Text;
-                tryConvertBuilder.AppendLine($@"            case ""{m.MemberSyntax.Identifier.Text}"":");
-                tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()} = {memberName}.Default;");
-                tryConvertBuilder.AppendLine($"                return true;");
+                parseBuilder.AppendLine(@$"        return value switch
+        {{");
+                tryConvertBuilder.AppendLine(@$"        switch (value)
+        {{");
+                foreach (var memberName in context.Members.Select(m => m.MemberSyntax.Identifier.Text))
+                {
+                    parseBuilder.AppendLine($"            \"{memberName}\" => {memberName}.Default,");
+
+                    tryConvertBuilder.AppendLine($@"            case ""{memberName}"":");
+                    tryConvertBuilder.AppendLine($"                {variantEnumName.ToLower()} = {memberName}.Default;");
+                    tryConvertBuilder.AppendLine($@"                return true;");
+                }
+                parseBuilder.Append(@$"            _ => throw new InvalidOperationException(nameof(value))
+        }};");
+                tryConvertBuilder.Append(@$"        }}
+        {variantEnumName.ToLower()} = default;
+        return false;");
+            }
+            else
+            {
+                parseBuilder.Append($"        throw new InvalidOperationException(nameof(value));");
+                tryConvertBuilder.Append(@$"        {variantEnumName.ToLower()} = default;
+        return false;");
             }
 
             var code = @$"    public static {variantEnumName} Parse(string value)
     {{
-        return value switch
-        {{
 {parseBuilder}
-        }};
     }}
 
     public static bool TryParse(string value, out {variantEnumName} {variantEnumName.ToLower()})
     {{
-        switch (value)
-        {{
 {tryConvertBuilder}
-        }}
-        {variantEnumName.ToLower()} = default;
-        return false;
     }}
 ";
             return code;
@@ -456,29 +471,38 @@ public abstract record {variantEnumName} : ISpanFormattable
         {
             var isDefinedBuilder = new StringBuilder();
             var isDefinedBuilder2 = new StringBuilder();
-            foreach (var m in context.Members)
+            if (context.Members.Length > 0)
             {
-                var memberName = m.MemberSyntax.Identifier.Text;
-                isDefinedBuilder.AppendLine($"            \"{memberName}\" => true,");
-                isDefinedBuilder2.AppendLine($"            {memberName} => true,");
+                isDefinedBuilder.AppendLine(@$"        return value switch
+        {{");
+                isDefinedBuilder2.AppendLine(@$"        return value switch
+        {{");
+                foreach (var m in context.Members)
+                {
+                    var memberName = m.MemberSyntax.Identifier.Text;
+                    isDefinedBuilder.AppendLine($"            \"{memberName}\" => true,");
+                    isDefinedBuilder2.AppendLine($"            {memberName} => true,");
+                }
+                isDefinedBuilder.AppendLine($"            _ => false");
+                isDefinedBuilder2.Append($"            _ => false");
+
+                isDefinedBuilder.Append(@$"        }};");
+                isDefinedBuilder2.Append(@$"        }};");
             }
-            isDefinedBuilder.AppendLine($"            _ => false");
-            isDefinedBuilder2.AppendLine($"            _ => false");
+            else
+            {
+                isDefinedBuilder.Append("        return false;");
+                isDefinedBuilder2.Append("        return false;");
+            }
 
             var code = @$"    public static bool IsDefined(string value)
     {{
-        return value switch
-        {{
 {isDefinedBuilder}
-        }};
     }}
 
     public static bool IsDefined({variantEnumName} value)
     {{
-        return value switch
-        {{
 {isDefinedBuilder2}
-        }};
     }}
 ";
             return code;
