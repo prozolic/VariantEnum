@@ -15,7 +15,7 @@ public class NoneTest
     [Fact]
     public void GetName()
     {
-        Assert.Throws<InvalidOperationException>(() => None.GetNumericValue(null));
+        Assert.Throws<ArgumentException>(() => None.GetNumericValue(null));
     }
 
     [Fact]
@@ -28,13 +28,13 @@ public class NoneTest
     [Fact]
     public void GetNumericValue()
     {
-        Assert.Throws<InvalidOperationException>(() => None.GetNumericValue(null));
+        Assert.Throws<ArgumentException>(() => None.GetNumericValue(null));
     }
 
     [Fact]
     public void ConvertEnum()
     {
-        Assert.Throws<InvalidOperationException>(() => None.ConvertEnum(null));
+        Assert.Throws<ArgumentException>(() => None.ConvertEnum(null));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class NoneTest
     [Fact]
     public void Parse()
     {
-        Assert.Throws<InvalidOperationException>(() => None.Parse("None"));
+        Assert.Throws<ArgumentException>(() => None.Parse("None"));
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class IpAddrTest
         IpAddr.GetName(v6).Should().Be(nameof(IpAddr.V6));
         IpAddr.GetName(none).Should().Be(nameof(IpAddr.None));
 
-        Assert.Throws<InvalidOperationException>(() => IpAddr.GetNumericValue(null));
+        Assert.Throws<ArgumentException>(() => IpAddr.GetNumericValue(null));
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class IpAddrTest
         IpAddr.GetNumericValue(v6).Should().Be((byte)IpAddrVariant.V6);
         IpAddr.GetNumericValue(none).Should().Be((byte)IpAddrVariant.None);
 
-        Assert.Throws<InvalidOperationException>(() => IpAddr.GetNumericValue(null));
+        Assert.Throws<ArgumentException>(() => IpAddr.GetNumericValue(null));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class IpAddrTest
         IpAddr.ConvertEnum(v6).Should().Be(IpAddrVariant.V6);
         IpAddr.ConvertEnum(none).Should().Be(IpAddrVariant.None);
 
-        Assert.Throws<InvalidOperationException>(() => IpAddr.ConvertEnum(null));
+        Assert.Throws<ArgumentException>(() => IpAddr.ConvertEnum(null));
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class IpAddrTest
         IpAddr.Parse("V6").Should().Be(IpAddr.V6.Default);
         IpAddr.Parse("None").Should().Be(IpAddr.None.Default);
 
-        Assert.Throws<InvalidOperationException>(() => IpAddr.Parse(string.Empty));
+        Assert.Throws<ArgumentException>(() => IpAddr.Parse(string.Empty));
     }
 
     [Fact]
