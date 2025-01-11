@@ -135,6 +135,17 @@ public abstract record {variantEnumName} :
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
 {EmitMethod(context, variantEnumName)}
+    [DoesNotReturn]
+    private static void ThrowRequestedValueNotFound(ReadOnlySpan<char> s)
+    {{
+        throw new ArgumentException($""Requested value '{{s}}' was not found."");
+    }}
+
+    [DoesNotReturn]
+    private static T ThrowInvalidType<T>()
+    {{
+        throw new ArgumentException($""Requested value was invalid type.'"");
+    }}
 }}";
             return code;
         }
@@ -318,16 +329,17 @@ public abstract record {variantEnumName} :
                     var memberName = m.MemberSyntax.Identifier.Text;
                     builder.AppendLine($"            {memberName} => nameof({memberName}),");
                 }
-                builder.AppendLine($"            _ => throw new ArgumentException(nameof({variantEnumName.ToLower()}))");
+                builder.AppendLine($"            _ => null");
                 builder.Append(@$"        }};");
             }
             else
             {
-                builder.Append($"        throw new ArgumentException(nameof({variantEnumName.ToLower()}));");
+                builder.Append($"        return null;");
             }
 
             var code = @$"
-    public static string GetName({variantEnumName} {variantEnumName.ToLower()})
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static string? GetName({variantEnumName} {variantEnumName.ToLower()})
     {{
 {builder}
     }}";
@@ -347,6 +359,7 @@ public abstract record {variantEnumName} :
             builder.Append("]");
 
             var code = @$"
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string[] GetNames() => {builder};";
             return code;
         }
@@ -374,15 +387,16 @@ public abstract record {variantEnumName} :
                         builder.AppendLine($"            {memberName} => {valueText},");
                     }
                 }
-                builder.AppendLine($"            _ => throw new ArgumentException(nameof({variantEnumName.ToLower()}))");
+                builder.AppendLine($"            _ => ThrowInvalidType<{symbol.EnumUnderlyingType}>()");
                 builder.Append(@$"        }};");
             }
             else
             {
-                builder.Append($"        throw new ArgumentException(nameof({variantEnumName.ToLower()}));");
+                builder.Append($"        return ThrowInvalidType<{symbol.EnumUnderlyingType}>();");
             }
 
             var code = @$"
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static {symbol.EnumUnderlyingType} GetNumericValue({variantEnumName} {variantEnumName.ToLower()})
     {{
 {builder}
@@ -401,7 +415,7 @@ public abstract record {variantEnumName} :
             {
                 convertBuilder.AppendLine(@$"        return {variantEnumName.ToLower()} switch
         {{");
-                tryConvertBuilder.Append(@$"        switch({variantEnumName.ToLower()})
+                tryConvertBuilder.AppendLine(@$"        switch({variantEnumName.ToLower()})
         {{");
                 foreach (var memberName in context.Members.Select(m => m.MemberSyntax.Identifier.Text))
                 {
@@ -411,7 +425,7 @@ public abstract record {variantEnumName} :
                     tryConvertBuilder.AppendLine($"                result = {enumName}.{memberName};");
                     tryConvertBuilder.AppendLine($"                return true;");
                 }
-                convertBuilder.AppendLine($"            _ => throw new ArgumentException(nameof({variantEnumName.ToLower()}))");
+                convertBuilder.AppendLine($"            _ => ThrowInvalidType<{enumName}>()");
                 convertBuilder.Append(@$"        }};");
 
                 tryConvertBuilder.Append(@$"        }}
@@ -420,18 +434,19 @@ public abstract record {variantEnumName} :
             }
             else
             {
-                convertBuilder.Append($"        throw new ArgumentException(nameof({variantEnumName.ToLower()}));");
+                convertBuilder.Append($"        return ThrowInvalidType<{enumName}>();");
                 tryConvertBuilder.Append(@$"        result = default;
         return false;");
             }
 
             var code = @$"
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static {enumName} ConvertEnum({variantEnumName} {variantEnumName.ToLower()})
     {{
 {convertBuilder}
     }}
 
-    public static bool TryConvertEnum({variantEnumName} {variantEnumName.ToLower()}, out {enumName} result)
+    public static bool TryConvertEnum([NotNullWhen(true)] {variantEnumName}? {variantEnumName.ToLower()}, [MaybeNullWhen(false)] out {enumName} result)
     {{
 {tryConvertBuilder}
     }}
@@ -475,16 +490,19 @@ public abstract record {variantEnumName} :
             return false;");
             }
 
-            var code = @$"    public static {variantEnumName} Parse([NotNullWhen(true)] string? s, IFormatProvider? provider = default)
+            var code = @$"    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static {variantEnumName} Parse(string s, IFormatProvider? provider = default)
     {{
         return Parse(s.AsSpan(), false, provider);
     }}
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static {variantEnumName} Parse(ReadOnlySpan<char> s, IFormatProvider? provider = default)
     {{
         return Parse(s, false, provider);
     }}
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static {variantEnumName} Parse(ReadOnlySpan<char> s, bool ignoreCase, IFormatProvider? provider = default)
     {{
         if (TryParse(s, ignoreCase, provider, out var result))
@@ -493,20 +511,24 @@ public abstract record {variantEnumName} :
         }}
         else
         {{
-            throw new ArgumentException($""Requested value '{{s}}' was not found."");
+            ThrowRequestedValueNotFound(s);
+            return default!;
         }}
     }}
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out {variantEnumName} result)
     {{
         return TryParse(s.AsSpan(), false, provider, out result);
     }}
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryParse(ReadOnlySpan<char> s, out {variantEnumName} result)
     {{
         return TryParse(s, false, null, out result);
     }}
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out {variantEnumName} result)
     {{
         return TryParse(s, false, null, out result);
@@ -555,12 +577,14 @@ public abstract record {variantEnumName} :
                 isDefinedBuilder2.Append("        return false;");
             }
 
-            var code = @$"    public static bool IsDefined(ReadOnlySpan<char> s)
+            var code = @$"    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsDefined(ReadOnlySpan<char> s)
     {{
 {isDefinedBuilder}
     }}
 
-    public static bool IsDefined({variantEnumName} value)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsDefined([NotNullWhen(true)] {variantEnumName}? value)
     {{
 {isDefinedBuilder2}
     }}

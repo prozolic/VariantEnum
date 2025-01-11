@@ -47,12 +47,16 @@ public class NoneTest
     public void Parse()
     {
         Assert.Throws<ArgumentException>(() => None.Parse("None"));
+        Assert.Throws<ArgumentException>(() => None.Parse("None".AsSpan()));
+        Assert.Throws<ArgumentException>(() => None.Parse("None", true));
     }
 
     [Fact]
     public void TryParse()
     {
         None.TryParse("None", out var _).Should().BeFalse();
+        None.TryParse("None".AsSpan(), out var _).Should().BeFalse();
+        None.TryParse("None", true, null, out var _).Should().BeFalse();
     }
 
     [Fact]
@@ -148,7 +152,7 @@ public class IpAddrTest
         IpAddr.GetName(v6).Should().Be(nameof(IpAddr.V6));
         IpAddr.GetName(none).Should().Be(nameof(IpAddr.None));
 
-        Assert.Throws<ArgumentException>(() => IpAddr.GetNumericValue(null));
+        IpAddr.GetName((IpAddr)default).Should().BeNull();
     }
 
     [Fact]
@@ -211,10 +215,15 @@ public class IpAddrTest
     public void Parse()
     {
         IpAddr.Parse("V4").Should().Be(IpAddr.V4.Default);
+        IpAddr.Parse("v4", true).Should().Be(IpAddr.V4.Default);
         IpAddr.Parse("V6").Should().Be(IpAddr.V6.Default);
+        IpAddr.Parse("v6", true).Should().Be(IpAddr.V6.Default);
         IpAddr.Parse("None").Should().Be(IpAddr.None.Default);
+        IpAddr.Parse("none", true).Should().Be(IpAddr.None.Default);
 
         Assert.Throws<ArgumentException>(() => IpAddr.Parse(string.Empty));
+        Assert.Throws<ArgumentException>(() => IpAddr.Parse(string.Empty.AsSpan()));
+        Assert.Throws<ArgumentException>(() => IpAddr.Parse(string.Empty, true));
     }
 
     [Fact]
@@ -222,12 +231,20 @@ public class IpAddrTest
     {
         IpAddr.TryParse("V4", out var v4Enum).Should().BeTrue();
         v4Enum.Should().Be(IpAddr.V4.Default);
+        IpAddr.TryParse("v4", true, null, out v4Enum).Should().BeTrue();
+        v4Enum.Should().Be(IpAddr.V4.Default);
         IpAddr.TryParse("V6", out var v6Enum).Should().BeTrue();
+        v6Enum.Should().Be(IpAddr.V6.Default);
+        IpAddr.TryParse("v6", true, null, out v6Enum).Should().BeTrue();
         v6Enum.Should().Be(IpAddr.V6.Default);
         IpAddr.TryParse("None", out var noneEnum).Should().BeTrue();
         noneEnum.Should().Be(IpAddr.None.Default);
+        IpAddr.TryParse("none", true, null, out noneEnum).Should().BeTrue();
+        noneEnum.Should().Be(IpAddr.None.Default);
 
         IpAddr.TryParse(string.Empty, out var _).Should().BeFalse();
+        IpAddr.TryParse(string.Empty.AsSpan(), out var _).Should().BeFalse();
+        IpAddr.TryParse(string.Empty, true, null,  out var _).Should().BeFalse();
     }
 
     [Fact]
