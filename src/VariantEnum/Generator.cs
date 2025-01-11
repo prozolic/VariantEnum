@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -18,12 +19,16 @@ using System;
 
 namespace VariantEnum;
 
-public class VariantValueTypeAttribute : Attribute
+public sealed class VariantValueTypeAttribute : Attribute
 {
     public VariantValueTypeAttribute(params Type[] types)
     {
     }
 }
+
+public sealed class IgnoreVariantAttribute : Attribute
+{}
+
 """);
         });
 
@@ -44,6 +49,15 @@ public class VariantValueTypeAttribute : Attribute
                 return false;
             }, static (context, ct) => context)
             .Combine(context.CompilationProvider)
+            .Where(pair => 
+            {
+                var (context, compilation) = pair;
+                var enumSyntax = (EnumDeclarationSyntax)context.Node;
+                var model = compilation.GetSemanticModel(enumSyntax.SyntaxTree);
+                var symbol = model.GetDeclaredSymbol(enumSyntax);
+
+                return !symbol?.GetAttribute("VariantEnum", "IgnoreVariantAttribute").Any() ?? false;
+            })
             .Select((gsc, ct) =>
             {
                 var (context, compilation) = gsc;
@@ -93,7 +107,11 @@ public class VariantValueTypeAttribute : Attribute
 
         if (source.EnumDeclarationSyntax.IsNested())
         {
-            // error
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.MustNotBeNestedType,
+                    syntax.Identifier.GetLocation(),
+                    syntax.Identifier.Text));
             return;
         }
 
