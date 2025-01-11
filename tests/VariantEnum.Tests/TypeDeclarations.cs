@@ -13,3 +13,13 @@ public enum IpAddrVariant : byte
     V6,
     None
 }
+
+public class IgnoreVariantTest
+{
+    // Test that no build errors occur
+    [IgnoreVariant]
+    public enum IgnoreVariant
+    {
+        A, B, C, D, E
+    }
+}
