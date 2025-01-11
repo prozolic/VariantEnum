@@ -179,7 +179,7 @@ public abstract record {variantEnumName} :
             {
 
                 var index = 0;
-                var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
+                var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault()!;
                 var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
                 var builder = new StringBuilder();
                 foreach (var a in arguments)
@@ -201,7 +201,7 @@ public abstract record {variantEnumName} :
 
             var builder = new StringBuilder();
             var index = 0;
-            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault();
+            var attr = syntax.MemberSyntax.AttributeLists.LastOrDefault()!;
             var arguments = attr.Attributes[0]!.ArgumentList!.Arguments;
             builder.Append("(");
             foreach (var a in arguments)
