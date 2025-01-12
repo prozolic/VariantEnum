@@ -9,7 +9,6 @@ This library is distributed via NuGet.
 
 > PM> Install-Package [VariantEnum](https://www.nuget.org/packages/VariantEnum/)
 
-
 How to use
 ---
 
@@ -436,6 +435,16 @@ public abstract record IpAddr :
 ```
 
 </details>
+
+### Ignore automatic generation
+
+If automatic generation is to be ignored, you assign the `[IgnoreVariant]` attribute.
+
+```csharp
+[IgnoreVariant]
+public enum TestVariant
+{}
+```
 
 Auto-generated API
 ---
