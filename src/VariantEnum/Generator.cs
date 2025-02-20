@@ -41,9 +41,9 @@ public sealed class IgnoreVariantAttribute : Attribute
                     var enumSyntax = node as EnumDeclarationSyntax;
                     if (enumSyntax == null) return false;
 
-                    // enum XXXX
+                    // enum XXXXVariant
                     var enumName = enumSyntax.Identifier.Text;
-                    return enumName.EndsWith("Variant");
+                    return enumName.EndsWith("Variant") && !(enumName == "Variant");
                 }
 
                 return false;
