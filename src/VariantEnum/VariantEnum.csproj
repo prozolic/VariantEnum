@@ -23,7 +23,7 @@
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.0.2</VersionPrefix>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <Description>Source generator that outputs variant-like record that allows different variants to hold variant-specific data.</Description>
   </PropertyGroup>
