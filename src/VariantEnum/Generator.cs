@@ -325,6 +325,7 @@ public abstract record {variantEnumName} :
             builder.AppendLine($"    public static int Count => {context.Members.Length};");
             builder.AppendLine(EmitGetName(context, variantEnumName));
             builder.AppendLine(EmitGetNames(context, variantEnumName));
+            builder.AppendLine(EmitGetUtf8Name(context, variantEnumName));
             builder.AppendLine(EmitGetNumericValue(context, variantEnumName));
             builder.AppendLine(EmitConvertEnum(context, variantEnumName));
             builder.AppendLine(EmitParse(context, variantEnumName));
@@ -381,6 +382,38 @@ public abstract record {variantEnumName} :
     public static string[] GetNames() => {builder};";
             return code;
         }
+
+        private static string EmitGetUtf8Name(VariantEnumContext context, string variantEnumName)
+        {
+            var builder = new StringBuilder();
+            var symbol = context.Symbol;
+
+            if (context.Members.Length > 0)
+            {
+                builder.AppendLine(@$"        return {variantEnumName.ToLower()} switch
+        {{");
+                foreach (var m in context.Members)
+                {
+                    var memberName = m.MemberSyntax.Identifier.Text;
+                    builder.AppendLine($"            {memberName} => \"{memberName}\"u8,");
+                }
+                builder.AppendLine($"            _ => []");
+                builder.Append(@$"        }};");
+            }
+            else
+            {
+                builder.Append($"        return [];");
+            }
+
+            var code = @$"
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ReadOnlySpan<byte> GetUtf8Name({variantEnumName} {variantEnumName.ToLower()})
+    {{
+{builder}
+    }}";
+            return code;
+        }
+
 
         private static string EmitGetNumericValue(VariantEnumContext context, string variantEnumName)
         {
@@ -549,7 +582,7 @@ public abstract record {variantEnumName} :
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out {variantEnumName} result)
     {{
-        return TryParse(s, false, null, out result);
+        return TryParse(s, false, provider, out result);
     }}
 
     public static bool TryParse(ReadOnlySpan<char> s, bool ignoreCase, IFormatProvider? provider, [MaybeNullWhen(false)] out {variantEnumName} result)
