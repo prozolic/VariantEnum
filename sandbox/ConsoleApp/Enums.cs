@@ -2,6 +2,12 @@
 
 namespace ConsoleApp;
 
+// uncreated.
+public enum Variant : byte
+{
+
+}
+
 public enum IpAddrVariant : byte
 {
     [VariantValueType(typeof(byte), typeof(byte), typeof(byte), typeof(byte))]
@@ -11,12 +17,19 @@ public enum IpAddrVariant : byte
     None
 }
 
-[IgnoreVariant]
 public enum TestVariant
 {
 
 }
 
+// uncreated.
+[IgnoreVariant]
+public enum TestIgnoreVariant
+{
+
+}
+
+// uncreated.
 public class A
 {
     [IgnoreVariant]

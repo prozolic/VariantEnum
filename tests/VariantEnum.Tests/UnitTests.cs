@@ -1,5 +1,6 @@
 using Shouldly;
 using System.Buffers;
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using Xunit;
 
@@ -165,6 +166,20 @@ public class IpAddrTest
         names[1].ShouldBe(nameof(IpAddr.V6));
         names[2].ShouldBe(nameof(IpAddr.None));
         names.Length.ShouldBe(3);
+    }
+
+    [Fact]
+    public void GetUtf8Name()
+    {
+        var v4 = new IpAddr.V4(127, 0, 0, 1);
+        var v6 = new IpAddr.V6("::1");
+        var none = new IpAddr.None();
+
+        IpAddr.GetUtf8Name(v4).SequenceEqual("V4"u8).ShouldBeTrue();
+        IpAddr.GetUtf8Name(v6).SequenceEqual("V6"u8).ShouldBeTrue();
+        IpAddr.GetUtf8Name(none).SequenceEqual("None"u8).ShouldBeTrue();
+
+        IpAddr.GetUtf8Name((IpAddr)default).SequenceEqual(""u8).ShouldBeTrue();
     }
 
     [Fact]
