@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/sandbox/">
+    <Project Path="sandbox/ConsoleApp/ConsoleApp.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/VariantEnum/VariantEnum.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VariantEnum.Tests/VariantEnum.Tests.csproj" />
+  </Folder>
+</Solution>
