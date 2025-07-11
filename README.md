@@ -1,7 +1,7 @@
-[VariantEnum](https://github.com/prozolic/VariantEnum)
+﻿[VariantEnum](https://github.com/prozolic/VariantEnum)
 ===
 
-[![MIT License](https://img.shields.io/github/license/prozolic/Utf8StringSplitter)](LICENSE)
+[![MIT License](https://img.shields.io/github/license/prozolic/VariantEnum)](LICENSE)
 
 `VariantEnum` is C# Source Generator that automatically creates a Rust Enum-like `record class` from an `Enum`, where each variant can have a value.  
 The automatically created `record` class makes use of .NET 8 and C# 12 language features (`Incremental Generator`, `ISpanParsable<T>`, static abstract interfaces and Collection expressions).  
@@ -13,7 +13,7 @@ How to use
 ---
 
 If the `Enum` definition name ends with 'Variant', a record class is automatically created with the same name as the enum definition name without 'Variant'. 
-Enum members can be assigned the `[TVariantValueType]` attribute so that they have their own specific data.. Values can be accessed as argsXXX.  
+Enum members can be assigned the `[TVariantValueType]` attribute so that they have their own specific data. Values can be accessed as argsXXX.  
 For example, if an `IpAddrVariant` Enum is defined:
 
 ```csharp
@@ -441,7 +441,7 @@ public abstract record IpAddr :
     [DoesNotReturn]
     private static T ThrowInvalidType<T>()
     {
-        throw new ArgumentException($"Requested value was invalid type.'");
+        throw new ArgumentException($"Requested value was invalid type.");
     }
 }
 ```
